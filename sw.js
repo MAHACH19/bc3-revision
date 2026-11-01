@@ -1,5 +1,5 @@
-// Cache hors ligne de l'appli (version 4d1484921c : change à chaque nouvelle fabrication)
-const CACHE = 'bc3-v1-4d1484921c';
+// Cache hors ligne de l'appli (version 5c291ce990 : change à chaque nouvelle fabrication)
+const CACHE = 'bc3-v1-5c291ce990';
 const PDF_CACHE = 'bc3-pdf';   // PDF gardés hors ligne : jamais effacés par une mise à jour
 const FILES = ["./", "index.html", "bibliotheque.html", "pdfs.json", "manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png", "vendor/pdf.min.js", "vendor/pdf.worker.min.js"];
 self.addEventListener('install', e => {
@@ -12,6 +12,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
+  if (url.pathname.includes('/podcast/')) return;   // audio lu par morceaux : sans cache (sinon Safari coince)
   if (url.pathname.endsWith('.pdf')) {   // PDF : cache d'abord (lourds, changent rarement)
     e.respondWith(caches.open(PDF_CACHE).then(c => c.match(e.request, {ignoreSearch: true}).then(r => r || fetch(e.request))));
     return;

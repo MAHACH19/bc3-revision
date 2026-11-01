@@ -229,7 +229,7 @@ const isCached = d => cached.has(d.path.split('/').slice(-5).join('/'));
 
 function render(){
   document.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.style === STYLE));
-  const docs = CAT.filter(d => d.style === STYLE);
+  const docs = CAT.filter(d => d.style === STYLE || d.style === 'all');
   const groups = [];
   for (const d of docs){
     let g = groups.find(x => x.vol === d.vol);
@@ -245,7 +245,7 @@ function render(){
       const size = c.docs.reduce((n,d)=>n+d.size,0);
       return `<details class="ch"><summary><span class="num">${c.chap ? esc(c.chap) : '★'}</span>
         <span class="ttl">${esc(c.chapTitle)}</span>
-        <span class="cnt">${nOff ? `<span class="off">✓ ${nOff}/${c.docs.length}</span>` : c.docs.length + ' PDF'}</span></summary>
+        <span class="cnt">${nOff ? `<span class="off">✓ ${nOff}/${c.docs.length}</span>` : c.docs.length + ' fichiers'}</span></summary>
         <div class="docs">${c.docs.map(d => `<button type="button" class="doc" data-i="${CAT.indexOf(d)}">
             <span><b>${esc(d.label)}</b><small>${mo(d.size)}</small></span>
             ${isCached(d) ? '<span class="off">✓ hors ligne</span>' : ''}</button>`).join('')}
@@ -279,7 +279,7 @@ document.getElementById('list').addEventListener('click', async e => {
   const dl = e.target.closest('.dl');
   if (dl){
     const [vol, chap] = dl.dataset.dl.split('|');
-    const list = CAT.filter(d => d.style === STYLE && d.vol === vol && d.chap === chap && !isCached(d));
+    const list = CAT.filter(d => (d.style === STYLE || d.style === 'all') && d.vol === vol && d.chap === chap && !isCached(d));
     dl.disabled = true; let i = 0;
     for (const d of list){ dl.textContent = `Téléchargement ${++i}/${list.length}…`;
       try { await getPdf(d); } catch(err) { dl.textContent = 'Pas de réseau, réessaie plus tard'; dl.disabled = false; return; } }
@@ -288,7 +288,7 @@ document.getElementById('list').addEventListener('click', async e => {
 });
 
 /* ---------- lecteur PDF ---------- */
-let PDF = null, zoom = 1, obs = null, task = 0;
+let PDF = null, zoom = 1, obs = null, task = 0, BLOB = null;
 const V = document.getElementById('viewer'), P = document.getElementById('pages'), PN = document.getElementById('pnum');
 
 async function openDoc(d){
@@ -297,6 +297,17 @@ async function openDoc(d){
   P.innerHTML = '<div id="msg">Chargement…</div>'; PN.hidden = true; zoom = 1;
   history.pushState({viewer: 1}, '');
   const my = ++task;
+  if (d.path.endsWith('.mp4')) {   // podcast : lecteur vidéo (blob = marche hors ligne sur iPhone)
+    try {
+      const buf = await getPdf(d); if (my !== task) return;
+      BLOB = URL.createObjectURL(new Blob([buf], {type: 'video/mp4'}));
+      P.innerHTML = '<video controls playsinline autoplay style="display:block;width:100%;max-width:900px;margin:0 auto;background:#000"></video>';
+      P.querySelector('video').src = BLOB;
+    } catch(e) {
+      P.innerHTML = `<div id="msg">Impossible de lire ce podcast.<br>${navigator.onLine ? '' : 'Pas de réseau, et ce podcast n\'a pas encore été gardé hors ligne.'}</div>`;
+    }
+    return;
+  }
   try {
     const buf = await getPdf(d);
     if (my !== task) return;
@@ -352,6 +363,8 @@ P.addEventListener('scroll', () => {
 
 function closeViewer(){
   task++; V.hidden = true; document.body.style.overflow = ''; if (obs) obs.disconnect();
+  const v = P.querySelector('video'); if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
+  if (BLOB) { URL.revokeObjectURL(BLOB); BLOB = null; }
   P.innerHTML = ''; if (PDF) { PDF.destroy(); PDF = null; } render();
 }
 document.getElementById('vClose').onclick = () => history.state && history.state.viewer ? history.back() : closeViewer();
@@ -366,8 +379,8 @@ document.getElementById('vOut').onclick = () => rezoom(1/1.4);
 (async () => {
   try { CAT = await (await fetch('pdfs.json')).json(); } catch(e) { document.getElementById('list').textContent = 'Catalogue introuvable.'; return; }
   await refreshCached(); render();
-  const n = CAT.filter(d => d.style === 'normal').length;
-  document.getElementById('hint').textContent = `${CAT.length} PDF (${n} en mise en page normale, ${CAT.length - n} en journal). Touche un document pour le lire. Un PDF ouvert une fois reste disponible sans réseau.`;
+  const n = CAT.filter(d => d.style === 'normal').length, j = CAT.filter(d => d.style === 'journal').length, pc = CAT.length - n - j;
+  document.getElementById('hint').textContent = `${n + j} PDF (${n} en mise en page normale, ${j} en journal)${pc ? ' et ' + pc + ' podcasts' : ''}. Touche un document pour l'ouvrir. Un fichier ouvert une fois reste disponible sans réseau.`;
 })();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
