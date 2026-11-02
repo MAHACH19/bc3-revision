@@ -204,6 +204,7 @@ details.ch>summary::-webkit-details-marker{display:none}
   <div class="bar">
     <button type="button" class="close" id="vClose">Fermer</button>
     <span class="t" id="vTitle"></span>
+    <a id="vNative" href="#" target="_blank" rel="noopener" style="border-radius:999px;background:var(--surface-2);padding:8px 12px;font-weight:700;font-size:14px;color:var(--ink);text-decoration:none">Ouvrir</a>
     <button type="button" id="vOut" aria-label="Dézoomer">−</button>
     <button type="button" id="vIn" aria-label="Zoomer">+</button>
   </div>
@@ -295,6 +296,7 @@ async function openDoc(d){
   V.hidden = false; document.body.style.overflow = 'hidden';
   document.getElementById('vTitle').textContent = d.label + (d.chapTitle ? ' · ' + d.chapTitle : '');
   P.innerHTML = '<div id="msg">Chargement…</div>'; PN.hidden = true; zoom = 1;
+  document.getElementById('vNative').href = d.path;   // lecteur intégré de l'iPhone, en secours
   history.pushState({viewer: 1}, '');
   const my = ++task;
   if (d.path.endsWith('.mp4')) {   // podcast : audio seul (blob = marche hors ligne sur iPhone)
@@ -311,11 +313,14 @@ async function openDoc(d){
   try {
     const buf = await getPdf(d);
     if (my !== task) return;
-    PDF = await pdfjsLib.getDocument({data: new Uint8Array(buf)}).promise;
+    PDF = await Promise.race([pdfjsLib.getDocument({data: new Uint8Array(buf)}).promise,
+      new Promise((_, ko) => setTimeout(() => ko(new Error('délai')), 20000))]);
     if (my !== task) return;
     layout(); render();
   } catch(e) {
-    P.innerHTML = `<div id="msg">Impossible d'ouvrir ce PDF.<br>${navigator.onLine ? '' : 'Pas de réseau, et ce document n\'a pas encore été gardé hors ligne.'}</div>`;
+    P.innerHTML = navigator.onLine
+      ? `<div id="msg">Le lecteur n'arrive pas à afficher ce PDF ici.<br><br><a href="${d.path}" target="_blank" rel="noopener" style="color:#fff;font-weight:700;text-decoration:underline">Ouvrir le PDF avec l'iPhone</a></div>`
+      : `<div id="msg">Pas de réseau, et ce document n'a pas encore été gardé hors ligne.</div>`;
   }
 }
 
