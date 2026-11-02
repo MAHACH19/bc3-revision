@@ -154,6 +154,9 @@ header.top .wrap{display:flex;align-items:center;gap:10px;padding-block:10px}
 .seg button{flex:1;border:0;background:none;padding:8px 10px;border-radius:999px;font-weight:700;font-size:14px;color:var(--muted)}
 .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .hint{color:var(--muted);font-size:14px;margin:8px 0 18px}
+.ext{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:12px 0 0;font-size:14.5px;font-weight:700;line-height:1.35}
+.ext input{width:20px;height:20px;margin:0;flex:none;accent-color:var(--accent)}
+.bigbtn{display:inline-block;margin-top:18px;border:0;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:16px;padding:14px 22px}
 .vol{margin:26px 0 8px}
 .vol h2{font-size:22px}
 .vol .sub{color:var(--muted);font-size:14px;margin-top:2px}
@@ -196,6 +199,7 @@ details.ch>summary::-webkit-details-marker{display:none}
     <button type="button" data-style="normal" aria-pressed="true">Normal</button>
     <button type="button" data-style="journal" aria-pressed="false">Journal</button>
   </div>
+  <label class="ext"><input type="checkbox" id="extApp"> Ouvrir les PDF directement dans une autre appli (Supernova, Fichiers, Livres…)</label>
   <p class="hint" id="hint">Touche un document pour le lire. Un PDF ouvert une fois reste disponible sans réseau.</p>
   <div id="list"></div>
 </main>
@@ -204,7 +208,7 @@ details.ch>summary::-webkit-details-marker{display:none}
   <div class="bar">
     <button type="button" class="close" id="vClose">Fermer</button>
     <span class="t" id="vTitle"></span>
-    <a id="vNative" href="#" target="_blank" rel="noopener" style="border-radius:999px;background:var(--surface-2);padding:8px 12px;font-weight:700;font-size:14px;color:var(--ink);text-decoration:none">Ouvrir</a>
+    <button type="button" id="vShare">Ouvrir dans…</button>
     <button type="button" id="vOut" aria-label="Dézoomer">−</button>
     <button type="button" id="vIn" aria-label="Zoomer">+</button>
   </div>
@@ -289,14 +293,30 @@ document.getElementById('list').addEventListener('click', async e => {
 });
 
 /* ---------- lecteur PDF ---------- */
-let PDF = null, zoom = 1, obs = null, task = 0, BLOB = null;
+let PDF = null, zoom = 1, obs = null, task = 0, BLOB = null, CUR = null;
+let EXT = false; try { EXT = localStorage.getItem('bc3-ext') === '1'; } catch(e) {}
+const extBox = document.getElementById('extApp'); extBox.checked = EXT;
+extBox.onchange = () => { EXT = extBox.checked; try { localStorage.setItem('bc3-ext', EXT ? '1' : '0'); } catch(e) {} };
+
+/* « Ouvrir dans… » : menu de partage de l'iPhone -> Supernova ou toute appli qui lit les PDF */
+async function shareDoc(d){
+  const name = d.path.split('/').pop();
+  try {
+    const buf = await getPdf(d);
+    const file = new File([buf], name, {type: d.path.endsWith('.mp4') ? 'audio/mp4' : 'application/pdf'});
+    if (navigator.canShare && navigator.canShare({files: [file]})) { await navigator.share({files: [file], title: d.label}); return true; }
+  } catch(e) { if (e && e.name === 'AbortError') return true; if (e && e.name === 'NotAllowedError') return false; }
+  window.open(d.path, '_blank');   // secours (ordinateur, vieux téléphone) : lecteur PDF du navigateur
+  return true;
+}
+document.getElementById('vShare').onclick = () => CUR && shareDoc(CUR);
 const V = document.getElementById('viewer'), P = document.getElementById('pages'), PN = document.getElementById('pnum');
 
 async function openDoc(d){
   V.hidden = false; document.body.style.overflow = 'hidden';
   document.getElementById('vTitle').textContent = d.label + (d.chapTitle ? ' · ' + d.chapTitle : '');
   P.innerHTML = '<div id="msg">Chargement…</div>'; PN.hidden = true; zoom = 1;
-  document.getElementById('vNative').href = d.path;   // lecteur intégré de l'iPhone, en secours
+  CUR = d;
   history.pushState({viewer: 1}, '');
   const my = ++task;
   if (d.path.endsWith('.mp4')) {   // podcast : audio seul (blob = marche hors ligne sur iPhone)
@@ -308,6 +328,15 @@ async function openDoc(d){
     } catch(e) {
       P.innerHTML = `<div id="msg">Impossible de lire ce podcast.<br>${navigator.onLine ? '' : 'Pas de réseau, et ce podcast n\'a pas encore été gardé hors ligne.'}</div>`;
     }
+    return;
+  }
+  if (EXT) {   // ouverture directe dans une autre appli
+    P.innerHTML = '<div id="msg">Préparation du PDF…</div>';
+    try {
+      await getPdf(d); if (my !== task) return;
+      P.innerHTML = `<div id="msg">${esc(d.label)}<br><button type="button" class="bigbtn" id="goExt">Ouvrir dans une autre appli…</button><br><br><small>Dans le menu qui s'ouvre, choisis Supernova (ou toute autre appli PDF). Sur iPhone, fais défiler la ligne des applis ou touche « Plus ». Sur Samsung ou Android, touche l'appli dans la liste.</small></div>`;
+      document.getElementById('goExt').onclick = () => shareDoc(d);
+    } catch(e) { P.innerHTML = '<div id="msg">Pas de réseau, et ce document n\'a pas encore été gardé hors ligne.</div>'; }
     return;
   }
   try {
