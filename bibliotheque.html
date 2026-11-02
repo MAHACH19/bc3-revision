@@ -199,7 +199,7 @@ details.ch>summary::-webkit-details-marker{display:none}
     <button type="button" data-style="normal" aria-pressed="true">Normal</button>
     <button type="button" data-style="journal" aria-pressed="false">Journal</button>
   </div>
-  <label class="ext"><input type="checkbox" id="extApp"> Ouvrir les PDF directement dans une autre appli (Supernova, Fichiers, Livres…)</label>
+  <label class="ext"><input type="checkbox" id="snApp"> Ouvrir les PDF dans Supernova (stylo, surligneur, notes, lecture à voix haute)</label>
   <p class="hint" id="hint">Touche un document pour le lire. Un PDF ouvert une fois reste disponible sans réseau.</p>
   <div id="list"></div>
 </main>
@@ -294,9 +294,13 @@ document.getElementById('list').addEventListener('click', async e => {
 
 /* ---------- lecteur PDF ---------- */
 let PDF = null, zoom = 1, obs = null, task = 0, BLOB = null, CUR = null;
-let EXT = false; try { EXT = localStorage.getItem('bc3-ext') === '1'; } catch(e) {}
-const extBox = document.getElementById('extApp'); extBox.checked = EXT;
-extBox.onchange = () => { EXT = extBox.checked; try { localStorage.setItem('bc3-ext', EXT ? '1' : '0'); } catch(e) {} };
+let SN = true; try { SN = localStorage.getItem('bc3-sn') !== '0'; } catch(e) {}
+const snBox = document.getElementById('snApp'); snBox.checked = SN;
+snBox.onchange = () => { SN = snBox.checked; try { localStorage.setItem('bc3-sn', SN ? '1' : '0'); } catch(e) {} };
+/* chapitres ouverts gardés quand on revient de Supernova */
+const keepOpen = () => { try { sessionStorage.setItem('bc3-open', JSON.stringify([...document.querySelectorAll('details.ch[open] .ttl')].map(e => e.textContent))); } catch(e) {} };
+function restoreOpen(){ try { const o = JSON.parse(sessionStorage.getItem('bc3-open') || '[]');
+  document.querySelectorAll('details.ch').forEach(d => { if (o.includes(d.querySelector('.ttl').textContent)) d.open = true; }); } catch(e) {} }
 
 /* « Ouvrir dans… » : menu de partage de l'iPhone -> Supernova ou toute appli qui lit les PDF */
 async function shareDoc(d){
@@ -313,6 +317,11 @@ document.getElementById('vShare').onclick = () => CUR && shareDoc(CUR);
 const V = document.getElementById('viewer'), P = document.getElementById('pages'), PN = document.getElementById('pnum');
 
 async function openDoc(d){
+  if (SN && d.path.endsWith('.pdf')) {   // directement dans Supernova PDF
+    keepOpen();
+    location.href = 'supernova.html?file=' + encodeURIComponent(d.path) + '&name=' + encodeURIComponent(d.label + (d.chapTitle ? ' · ' + d.chapTitle : ''));
+    return;
+  }
   V.hidden = false; document.body.style.overflow = 'hidden';
   document.getElementById('vTitle').textContent = d.label + (d.chapTitle ? ' · ' + d.chapTitle : '');
   P.innerHTML = '<div id="msg">Chargement…</div>'; PN.hidden = true; zoom = 1;
@@ -328,15 +337,6 @@ async function openDoc(d){
     } catch(e) {
       P.innerHTML = `<div id="msg">Impossible de lire ce podcast.<br>${navigator.onLine ? '' : 'Pas de réseau, et ce podcast n\'a pas encore été gardé hors ligne.'}</div>`;
     }
-    return;
-  }
-  if (EXT) {   // ouverture directe dans une autre appli
-    P.innerHTML = '<div id="msg">Préparation du PDF…</div>';
-    try {
-      await getPdf(d); if (my !== task) return;
-      P.innerHTML = `<div id="msg">${esc(d.label)}<br><button type="button" class="bigbtn" id="goExt">Ouvrir dans une autre appli…</button><br><br><small>Dans le menu qui s'ouvre, choisis Supernova (ou toute autre appli PDF). Sur iPhone, fais défiler la ligne des applis ou touche « Plus ». Sur Samsung ou Android, touche l'appli dans la liste.</small></div>`;
-      document.getElementById('goExt').onclick = () => shareDoc(d);
-    } catch(e) { P.innerHTML = '<div id="msg">Pas de réseau, et ce document n\'a pas encore été gardé hors ligne.</div>'; }
     return;
   }
   try {
@@ -412,7 +412,7 @@ document.getElementById('vOut').onclick = () => rezoom(1/1.4);
 
 (async () => {
   try { CAT = await (await fetch('pdfs.json')).json(); } catch(e) { document.getElementById('list').textContent = 'Catalogue introuvable.'; return; }
-  await refreshCached(); render();
+  await refreshCached(); render(); restoreOpen();
   const n = CAT.filter(d => d.style === 'normal').length, j = CAT.filter(d => d.style === 'journal').length, pc = CAT.length - n - j;
   document.getElementById('hint').textContent = `${n + j} PDF (${n} en mise en page normale, ${j} en journal)${pc ? ' et ' + pc + ' podcasts' : ''}. Touche un document pour l'ouvrir. Un fichier ouvert une fois reste disponible sans réseau.`;
 })();
