@@ -332,8 +332,9 @@ async function openDoc(d){
     try {
       const buf = await getPdf(d); if (my !== task) return;
       BLOB = URL.createObjectURL(new Blob([buf], {type: 'video/mp4'}));
-      P.innerHTML = '<div style="max-width:600px;margin:40px auto;padding:0 16px;text-align:center;color:#fff"><div style="font-size:56px">🎧</div><p style="font-weight:700">' + esc(d.chapTitle) + '</p><audio controls autoplay style="width:100%"></audio></div>';
-      P.querySelector('audio').src = BLOB;
+      const vid = /_video\.mp4$/.test(d.path);
+      P.innerHTML = '<div style="max-width:' + (vid ? '960' : '600') + 'px;margin:' + (vid ? '16' : '40') + 'px auto;padding:0 16px;text-align:center;color:#fff">' + (vid ? '' : '<div style="font-size:56px">🎧</div>') + '<p style="font-weight:700">' + esc(d.chapTitle) + '</p>' + (vid ? '<video controls autoplay playsinline style="width:100%;aspect-ratio:16/9;border-radius:12px;background:#000"></video>' : '<audio controls autoplay style="width:100%"></audio>') + '</div>';
+      P.querySelector(vid ? 'video' : 'audio').src = BLOB;
     } catch(e) {
       P.innerHTML = `<div id="msg">Impossible de lire ce podcast.<br>${navigator.onLine ? '' : 'Pas de réseau, et ce podcast n\'a pas encore été gardé hors ligne.'}</div>`;
     }
