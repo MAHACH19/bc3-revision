@@ -284,7 +284,7 @@ document.getElementById('list').addEventListener('click', async e => {
   const dl = e.target.closest('.dl');
   if (dl){
     const [vol, chap] = dl.dataset.dl.split('|');
-    const list = CAT.filter(d => (d.style === STYLE || d.style === 'all') && d.vol === vol && d.chap === chap && !isCached(d));
+    const list = CAT.filter(d => (d.style === STYLE || d.style === 'all') && d.vol === vol && d.chap === chap && !isCached(d) && !d.path.endsWith('_doc.mp4'));
     dl.disabled = true; let i = 0;
     for (const d of list){ dl.textContent = `Téléchargement ${++i}/${list.length}…`;
       try { await getPdf(d); } catch(err) { dl.textContent = 'Pas de réseau, réessaie plus tard'; dl.disabled = false; return; } }
@@ -328,6 +328,11 @@ async function openDoc(d){
   CUR = d;
   history.pushState({viewer: 1}, '');
   const my = ++task;
+  if (d.path.endsWith('_doc.mp4')) {   // documentaire (lourd) : lu en continu depuis le site, sans le garder hors ligne
+    P.innerHTML = '<div style="max-width:960px;margin:16px auto;padding:0 16px;text-align:center;color:#fff"><p style="font-weight:700">🎬 ' + esc(d.chapTitle) + '</p><video controls autoplay playsinline preload="metadata" style="width:100%;aspect-ratio:16/9;border-radius:12px;background:#000"></video><p style="opacity:.75;font-size:13px">Le documentaire se regarde avec le réseau (il est trop lourd pour être gardé hors ligne).</p></div>';
+    P.querySelector('video').src = d.path;
+    return;
+  }
   if (d.path.endsWith('.mp4')) {   // podcast : audio seul (blob = marche hors ligne sur iPhone)
     try {
       const buf = await getPdf(d); if (my !== task) return;
