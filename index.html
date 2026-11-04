@@ -1189,12 +1189,29 @@ function renderHome(){
 }
 
 /* ---------- Chapitre ---------- */
+const DOCS = {"1": "podcast/ch01_doc.mp4", "2": "podcast/ch02_doc.mp4", "3": "podcast/ch03_doc.mp4", "4": "podcast/ch04_doc.mp4", "5": "podcast/ch05_doc.mp4", "6": "podcast/ch06_doc.mp4", "7": "podcast/ch07_doc.mp4", "8": "podcast/ch08_doc.mp4", "9": "podcast/ch09_doc.mp4"};
+function panelDocu(p, n){
+  const key = "bc3doc" + n;
+  p.innerHTML = `<div class="card"><div class="eyebrow">Documentaire</div>
+    <p class="muted">Le chapitre raconté comme un documentaire, avec cartes, frises et schémas. Il faut le réseau pour le regarder.</p>
+    <video id="docu" controls playsinline preload="metadata" src="${DOCS[n]}" style="width:100%;aspect-ratio:16/9;border-radius:14px;background:#0b1020;margin:.6rem 0"></video>
+    <div class="chips" id="docspeed">${[1, 1.25, 1.5].map(v => `<button class="chip" type="button" data-v="${v}">×${String(v).replace(".", ",")}</button>`).join("")}</div></div>`;
+  const a = p.querySelector("#docu");
+  let rate = 1; try { rate = +localStorage.getItem("bc3podrate") || 1; } catch (_) {}
+  const setRate = v => { rate = v; a.playbackRate = v; p.querySelectorAll("#docspeed [data-v]").forEach(b => b.setAttribute("aria-pressed", +b.dataset.v === v)); try { localStorage.setItem("bc3podrate", v); } catch (_) {} };
+  p.querySelectorAll("#docspeed [data-v]").forEach(b => b.onclick = () => setRate(+b.dataset.v));
+  setRate(rate);
+  a.addEventListener("loadedmetadata", () => { a.playbackRate = rate; let t = 0; try { t = +localStorage.getItem(key) || 0; } catch (_) {} if (t > 5 && t < a.duration - 5) a.currentTime = t; }, { once:true });
+  a.addEventListener("play", () => { a.playbackRate = rate; });
+  let last = 0;
+  a.addEventListener("timeupdate", () => { if (Math.abs(a.currentTime - last) > 4) { last = a.currentTime; try { localStorage.setItem(key, a.currentTime); } catch (_) {} } });
+}
 function tabsFor(n){
   const e = CH[n].ext || {}; const t = [["fiche","L'essentiel"]];
   if (e.fiche) t.push(["complete","Fiche complète"]);
   if (e.notes) t.push(["notes","Prise de notes"]);
   if (e.carte) t.push(["carte","Carte mentale"]);
-  if (typeof PODS !== "undefined" && PODS[n]) t.push(["podcast","Podcast"]);
+  if (typeof PODS !== "undefined" && PODS[n]) t.push(["podcast","Podcast"]); if (typeof DOCS !== "undefined" && DOCS[n]) t.push(["docu","Documentaire"]);
   t.push(["schemas","Schémas"],["cartes","Flashcards"],["quiz","Quiz"]);
   return t;
 }
@@ -1229,6 +1246,7 @@ function renderChapter(n){
   else if (tab === "notes") panelDoc(p, e.notes);
   else if (tab === "carte") panelCarte(p, e.carte);
   else if (tab === "podcast") panelPodcast(p, n);
+  else if (tab === "docu") panelDocu(p, n);
   else if (tab === "schemas") { if (e.svgs) panelSvgs(p, e.svgs); else panelSchemas(p, c); }
   else if (tab === "cartes") Flash(p, CH[n].cards, () => renderChapterKeepTab(n));
   else Quiz(p, { pool:CH[n].qs, count:10, chapter:n });
