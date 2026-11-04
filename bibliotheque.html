@@ -208,6 +208,7 @@ details.ch>summary::-webkit-details-marker{display:none}
   <div class="bar">
     <button type="button" class="close" id="vClose">Fermer</button>
     <span class="t" id="vTitle"></span>
+    <button type="button" id="vSn">Supernova</button>
     <button type="button" id="vShare">Ouvrir dans…</button>
     <button type="button" id="vOut" aria-label="Dézoomer">−</button>
     <button type="button" id="vIn" aria-label="Zoomer">+</button>
@@ -294,9 +295,9 @@ document.getElementById('list').addEventListener('click', async e => {
 
 /* ---------- lecteur PDF ---------- */
 let PDF = null, zoom = 1, obs = null, task = 0, BLOB = null, CUR = null;
-let SN = true; try { SN = localStorage.getItem('bc3-sn') !== '0'; } catch(e) {}
+let SN = true; try { SN = localStorage.getItem('bc3-sn2') !== '0'; } catch(e) {}
 const snBox = document.getElementById('snApp'); snBox.checked = SN;
-snBox.onchange = () => { SN = snBox.checked; try { localStorage.setItem('bc3-sn', SN ? '1' : '0'); } catch(e) {} };
+snBox.onchange = () => { SN = snBox.checked; try { localStorage.setItem('bc3-sn2', SN ? '1' : '0'); } catch(e) {} };
 /* chapitres ouverts gardés quand on revient de Supernova */
 const keepOpen = () => { try { sessionStorage.setItem('bc3-open', JSON.stringify([...document.querySelectorAll('details.ch[open] .ttl')].map(e => e.textContent))); } catch(e) {} };
 function restoreOpen(){ try { const o = JSON.parse(sessionStorage.getItem('bc3-open') || '[]');
@@ -314,6 +315,7 @@ async function shareDoc(d){
   return true;
 }
 document.getElementById('vShare').onclick = () => CUR && shareDoc(CUR);
+document.getElementById('vSn').onclick = () => { if (!CUR) return; keepOpen(); location.href = 'supernova.html?file=' + encodeURIComponent(CUR.path) + '&name=' + encodeURIComponent(CUR.label + (CUR.chapTitle ? ' · ' + CUR.chapTitle : '')); };
 const V = document.getElementById('viewer'), P = document.getElementById('pages'), PN = document.getElementById('pnum');
 
 async function openDoc(d){

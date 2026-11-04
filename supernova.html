@@ -4155,8 +4155,9 @@ if (IN_APP) {
         if (hit) buf = await hit.arrayBuffer();
         else { const r = await fetch(f); if (r.ok) { await c.put(f, r.clone()); buf = await r.arrayBuffer(); } } } catch (e) {}
       if (!buf) { try { const r = await fetch(f); if (r.ok) buf = await r.arrayBuffer(); } catch (e) {} }
-      if (buf) { await loadPdf(new Uint8Array(buf), nm); if (S.pdf) return; }
-      toast(navigator.onLine ? "Ce PDF n'a pas pu s'ouvrir." : "Pas de réseau, et ce PDF n'a pas encore été gardé hors ligne.", 6000);
+      let why = "";
+      if (buf) { try { await loadPdf(new Uint8Array(buf), nm); if (S.pdf) return; } catch (e) { why = " (" + (e && e.message || e) + ")"; } }
+      toast(navigator.onLine ? "Ce PDF n'a pas pu s'ouvrir" + why + "." : "Pas de réseau, et ce PDF n'a pas encore été gardé hors ligne.", 12000);
     }
     const bytes = await buildSample();
     if (/^#demo-/.test(location.hash)) {                     // captures d'écran du guide
